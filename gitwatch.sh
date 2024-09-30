@@ -41,6 +41,7 @@ BRANCH=""
 SLEEP_TIME=2
 DATE_FMT="+%Y-%m-%d %H:%M:%S"
 COMMITMSG="Scripted auto-commit on change (%d) by gitwatch.sh"
+COMMITMSG_SCRIPT=""
 LISTCHANGES=-1
 LISTCHANGES_COLOR="--color=always"
 GIT_DIR=""
@@ -88,6 +89,7 @@ shelp() {
   echo "                  (unless the <fmt> specified by -d is empty, in which case %d"
   echo "                  is replaced by an empty string); the default message is:"
   echo '                  "Scripted auto-commit on change (%d) by gitwatch.sh"'
+  echo " -S <msg-script>  Path to a script/executable that generates a commit message"
   echo " -e <events>      Events passed to inotifywait to watch (defaults to "
   echo "                  '$EVENTS')"
   echo "                  (useful when using inotify-win, e.g. -e modify,delete,move)"
@@ -135,7 +137,7 @@ is_merging () {
 
 ###############################################################################
 
-while getopts b:d:h:g:L:l:m:p:r:s:e:x:MR option; do # Process command line options
+while getopts b:d:h:g:L:l:m:p:r:s:S:e:x:MR option; do # Process command line options
   case "${option}" in
     b) BRANCH=${OPTARG} ;;
     d) DATE_FMT=${OPTARG} ;;
@@ -154,6 +156,7 @@ while getopts b:d:h:g:L:l:m:p:r:s:e:x:MR option; do # Process command line optio
     p | r) REMOTE=${OPTARG} ;;
     R) PULL_BEFORE_PUSH=1 ;;
     s) SLEEP_TIME=${OPTARG} ;;
+    S) COMMITMSG_SCRIPT=${OPTARG} ;;
     x) EXCLUDE_PATTERN=${OPTARG} ;;
     e) EVENTS=${OPTARG} ;;
     *)
@@ -335,6 +338,7 @@ diff-lines() {
   done
 }
 
+
 ###############################################################################
 
 # main program loop: wait for changes and commit them
@@ -359,7 +363,12 @@ eval "$INW" "${INW_ARGS[@]}" | while read -r line; do
       FORMATTED_COMMITMSG="${COMMITMSG/\%d/$(date "$DATE_FMT")}" # splice the formatted date-time into the commit message
     fi
 
-    if [[ $LISTCHANGES -ge 0 ]]; then # allow listing diffs in the commit log message, unless if there are too many lines changed
+    if [ -n "$COMMITMSG_SCRIPT" ]; then
+
+
+      FORMATTED_COMMITMSG=$($COMMITMSG_SCRIPT "$TARGETDIR")
+
+    elif [[ $LISTCHANGES -ge 0 ]]; then # allow listing diffs in the commit log message, unless if there are too many lines changed
       DIFF_COMMITMSG="$($GIT diff -U0 "$LISTCHANGES_COLOR" | diff-lines)"
       LENGTH_DIFF_COMMITMSG=0
       if [[ $LISTCHANGES -ge 1 ]]; then
